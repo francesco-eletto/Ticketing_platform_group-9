@@ -8,7 +8,7 @@ servers:
     description: Catalogue API Gateway
 
 paths:
-  /catalogue/events:
+  /events:
     get:
       summary: Recupero Lista Eventi
       description: Restituisce l'elenco di tutti gli eventi disponibili a catalogo per essere mostrati nella pagina principale.
@@ -46,7 +46,7 @@ paths:
                 message: "Internal Server Error"
                 details: "Database connection failed"
 
-  /catalogue/events/{id_event}:
+  /events/{id_event}:
     get:
       summary: Esplorazione Singolo Evento
       description: Restituisce i dettagli di uno specifico evento e la lista dei settori disponibili con i relativi prezzi.
