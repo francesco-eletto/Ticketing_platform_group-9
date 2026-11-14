@@ -1,0 +1,205 @@
+openapi: 3.1.0
+info:
+  title: Ticketing Platform Catalogue API contract
+  description: Contratti API RESTful per il microservizio Catalogue della piattaforma di Ticketing.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api/v1     # temporaneo
+    description: Catalogue API Gateway
+
+paths:
+  /catalogue/events:
+    get:
+      summary: Recupero Lista Eventi
+      description: Restituisce l'elenco di tutti gli eventi disponibili a catalogo per essere mostrati nella pagina principale.
+      operationId: getEventsList
+      responses:
+        '200':
+          description: Lista degli eventi recuperata con successo.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventSummary'
+              example:
+                - id_event: 4711
+                  name: "Concerto Rock Live"
+                  date: "2026-12-15"
+                  start_time: "21:00:00"
+                  end_time: "23:30:00"
+                  thumbnail_path: "/images/events/rock_live_4711.jpg"
+                - id_event: 4712
+                  name: "Spettacolo Teatrale - Amleto"
+                  date: "2026-12-20"
+                  start_time: "20:30:00"
+                  end_time: "23:00:00"
+                  thumbnail_path: "/images/events/amleto_4712.jpg"
+        '500':
+          description: Errore interno del server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 500
+                message: "Internal Server Error"
+                details: "Database connection failed"
+
+  /catalogue/events/{id_event}:
+    get:
+      summary: Esplorazione Singolo Evento
+      description: Restituisce i dettagli di uno specifico evento e la lista dei settori disponibili con i relativi prezzi.
+      operationId: getEventDetailsById
+      parameters:
+        - name: id_event
+          in: path
+          description: ID dell'evento da recuperare.
+          required: true
+          schema:
+            type: integer
+            example: 4711
+      responses:
+        '200':
+          description: Dettagli dell'evento e configurazione dei settori restituiti con successo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDetails'
+              example:
+                id_event: 4711
+                name: "Concerto Rock Live"
+                date: "2026-12-15"
+                start_time: "21:00:00"
+                end_time: "23:30:00"
+                thumbnail_path: "/images/events/rock_live_4711.jpg"
+                sectors:
+                  - id_sector: 101
+                    sector_label: "Parterre in piedi"
+                    capacity: 5000
+                    price: 4550
+                  - id_sector: 102
+                    sector_label: "Tribuna numerata"
+                    capacity: 2500
+                    price: 7500
+        '404':
+          description: Evento non trovato.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 404
+                message: "Not Found"
+                details: "Event with ID 4711 not found in the catalogue."
+        '400':
+          description: Richiesta malformata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 400
+                message: "Bad Request"
+                details: "Invalid format for id_event parameter."
+        '500':
+          description: Errore interno del server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 500
+                message: "Internal Server Error"
+                details: "Database query execution failed."
+
+components:
+  schemas:
+    EventSummary:
+      type: object
+      description: Struttura dati contenente le informazioni base di un evento.
+      properties:
+        id_event:
+          type: integer
+          description: Identificatio dell'evento.
+        name:
+          type: string
+          description: Nome completo dell'evento.
+        date:
+          type: string
+          format: date
+          description: Data in cui si terrà l'evento.
+        start_time:
+          type: string
+          format: time
+          description: Orario di inizio ufficiale dell'evento.
+        end_time:
+          type: string
+          format: time
+          description: Orario di fine previsto per l'evento.
+        thumbnail_path:
+          type: string
+          description: Percorso logico dell'immagine di copertina dell'evento.
+          
+    EventDetails:
+      type: object
+      description: Dettagli completi di un evento, inclusa la configurazione dei settori logici e i prezzi associati.
+      properties:
+        id_event:
+          type: integer
+          description: Identificativo dell'evento.
+        name:
+          type: string
+          description: Nome completo dell'evento.
+        date:
+          type: string
+          format: date
+          description: Data in cui si terrà l'evento.
+        start_time:
+          type: string
+          format: time
+          description: Orario di inizio.
+        end_time:
+          type: string
+          format: time
+          description: Orario di fine previsto.
+        thumbnail_path:
+          type: string
+          description: Percorso logico dell'immagine di copertina.
+        sectors:
+          type: array
+          description: Array contenente tutti i settori disponibili per questo evento.
+          items:
+            $ref: '#/components/schemas/SectorPrice'
+            
+    SectorPrice:
+      type: object
+      description: Struttura dati che unisce le informazioni di un settore con il prezzo stabilito per uno specifico evento.
+      properties:
+        id_sector:
+          type: integer
+          description: Identificativo del settore.
+        sector_label:
+          type: string
+          description: Nome del settore per la mappa.
+        capacity:
+          type: integer
+          description: Capienza massima in questo specifico settore.
+        price:
+          type: number
+          format: integer
+          description: "Costo del biglietto per questo settore durante questo specifico evento in centesimi per evitare problemi di arrotondamento"
+
+    ErrorResponse:
+      type: object
+      description: Modello standard per la restituzione degli errori da parte delle API.
+      properties:
+        code:
+          type: integer
+          description: Codice di stato HTTP dell'errore.
+        message:
+          type: string
+          description: Messaggio di errore.
+        details:
+          type: string
+          description: Dettaglio tecnico specifico dell'errore.
