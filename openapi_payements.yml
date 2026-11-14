@@ -1,0 +1,154 @@
+openapi: 3.1.0
+info:
+  title: Ticketing Platform Payments API contract
+  description: API RESTful per il microservizio Payments della piattaforma di Ticketing.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8082/api/v1         # temporaneo
+    description: Payments API Gateway
+
+paths:
+  /transactions:
+      post:
+        summary: Inizializzazione Transazione di Pagamento
+        description: Chiamato internamente da Inventory & Orders per creare la transazione e generare la chiamata verso il Gateway esterno.
+        operationId: createTransaction
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionRequest'
+              example:
+                id_order: 12345
+                amount: 12050
+        responses:
+          '201':
+            description: Transazione creata con successo.
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/TransactionResponse'
+                example:
+                  id_transaction: 778899
+                  payment_url: "https://checkout.stripe.com/pay/cs_test_12345"
+                  status: "PENDING"
+          '400':
+            description: Richiesta malformata.
+            content:
+              application/problem+json:
+                schema:
+                  $ref: '#/components/schemas/ProblemDetail'
+          '500':
+            description: Errore interno del server.
+            content:
+              application/problem+json:
+                schema:
+                  $ref: '#/components/schemas/ProblemDetail'
+  /webhook:
+    post:
+      summary: Ricezione Conferma Pagamento
+      description: Endpoint chiamato in asincrono dal provider di pagamento esterno per comunicarci l'esito della transazione.
+      operationId: processPaymentWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookPayload'
+            example:
+              idempotency_key: "tx-stripe-123456789"
+              id_order: 12345
+              status: "PAID"
+              amount: 12050
+      responses:
+        '200':
+          description: Webhook ricevuto ed elaborato (o ignorato se era un duplicato).
+        '400':
+          description: Payload non valido o campi mancanti.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "about:blank"
+                title: "Bad Request"
+                status: 400
+                detail: "Manca la idempotency_key nel payload."
+                instance: "/webhook"
+        '500':
+          description: Errore interno del server.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/errors/internal-server-error"
+                title: "Internal Server Error"
+                status: 500
+                detail: "Errore durante il salvataggio nella tabella Webhook."
+                instance: "/webhook"
+
+components:
+  schemas:
+    TransactionRequest:
+        type: object
+        description: Payload inviato da Inventory & Orders per avviare il pagamento.
+        properties:
+          id_order:
+            type: integer
+            description: L'ID dell'ordine appena creato in stato PENDING.
+          amount:
+            type: integer
+            description: Importo totale da addebitare espresso in centesimi.
+            
+    TransactionResponse:
+      type: object
+      description: Risposta restituita per reindirizzare l'utente al pagamento.
+      properties:
+        id_transaction:
+          type: integer
+          description: L'ID della transazione creata nel database Payments.
+        payment_url:
+          type: string
+          description: URL del gateway esterno a cui reindirizzare l'utente.
+        status:
+          type: string
+          description: Stato iniziale della transazione.
+          
+    WebhookPayload:
+      type: object
+      description: Payload inviato dal gateway di pagamento.
+      properties:
+        idempotency_key:
+          type: string
+          description: Chiave univoca inviata dal provider per impedire che processiamo due volte lo stesso pagamento.
+        id_order:
+          type: integer
+          description: L'ordine a cui si riferisce la transazione.
+        status:
+          type: string
+          description: Esito del pagamento.
+        amount:
+          type: integer
+          description: "Importo pagato espresso in centesimi per evitare problemi di arrotondamento."
+
+    ProblemDetail:
+      type: object
+      description: Formato standard RFC 7807 per la gestione degli errori API.
+      properties:
+        type:
+          type: string
+          description: Un URI che identifica il tipo di problema.
+        title:
+          type: string
+          description: Breve titolo descrittivo dell'errore.
+        status:
+          type: integer
+          description: Codice HTTP dell'errore.
+        detail:
+          type: string
+          description: Spiegazione dettagliata dell'errore.
+        instance:
+          type: string
+          description: L'URI specifico dove si è verificato l'errore.
