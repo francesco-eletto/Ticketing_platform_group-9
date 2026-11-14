@@ -4,7 +4,7 @@ info:
   description: Contratti API RESTful per il microservizio Catalogue della piattaforma di Ticketing.
   version: 1.0.0
 servers:
-  - url: http://localhost:8080/api/v1     # temporaneo
+  - url: http://localhost:8080/api/v1         # temporaneo
     description: Catalogue API Gateway
 
 paths:
@@ -38,13 +38,15 @@ paths:
         '500':
           description: Errore interno del server.
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
               example:
-                code: 500
-                message: "Internal Server Error"
-                details: "Database connection failed"
+                type: "http://localhost:8080/errors/internal-server-error"
+                title: "Internal Server Error"
+                status: 500
+                detail: "Database connection failed while retrieving events."
+                instance: "/events"
 
   /events/{id_event}:
     get:
@@ -85,33 +87,39 @@ paths:
         '404':
           description: Evento non trovato.
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
               example:
-                code: 404
-                message: "Not Found"
-                details: "Event with ID 4711 not found in the catalogue."
+                type: "http://localhost:8080/errors/event-not-found"
+                title: "Event Not Found"
+                status: 404
+                detail: "Event with ID 4711 not found in the catalogue."
+                instance: "/events/4711"
         '400':
           description: Richiesta malformata.
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
               example:
-                code: 400
-                message: "Bad Request"
-                details: "Invalid format for id_event parameter."
+                type: "about:blank"
+                title: "Bad Request"
+                status: 400
+                detail: "Invalid format for id_event parameter. Expected integer."
+                instance: "/events/abc"
         '500':
           description: Errore interno del server.
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ProblemDetail'
               example:
-                code: 500
-                message: "Internal Server Error"
-                details: "Database query execution failed."
+                type: "http://localhost:8080/errors/internal-server-error"
+                title: "Internal Server Error"
+                status: 500
+                detail: "Database query execution failed."
+                instance: "/events/4711"
 
 components:
   schemas:
@@ -121,7 +129,7 @@ components:
       properties:
         id_event:
           type: integer
-          description: Identificatio dell'evento.
+          description: Identificativo dell'evento.
         name:
           type: string
           description: Nome completo dell'evento.
@@ -143,7 +151,7 @@ components:
           
     EventDetails:
       type: object
-      description: Dettagli completi di un evento, inclusa la configurazione dei settori logici e i prezzi associati.
+      description: Dettagli completi di un evento, inclusa la configurazione dei settori e i prezzi associati.
       properties:
         id_event:
           type: integer
@@ -186,20 +194,25 @@ components:
           type: integer
           description: Capienza massima in questo specifico settore.
         price:
-          type: number
-          format: integer
-          description: "Costo del biglietto per questo settore durante questo specifico evento in centesimi per evitare problemi di arrotondamento"
-
-    ErrorResponse:
-      type: object
-      description: Modello standard per la restituzione degli errori da parte delle API.
-      properties:
-        code:
           type: integer
-          description: Codice di stato HTTP dell'errore.
-        message:
+          description: "Costo del biglietto per questo settore espresso in centesimi."
+
+    ProblemDetail:
+      type: object
+      description: Modello standard RFC 7807 per la restituzione degli errori da parte delle API.
+      properties:
+        type:
           type: string
-          description: Messaggio di errore.
-        details:
+          description: URI che identifica il tipo di problema.
+        title:
           type: string
-          description: Dettaglio tecnico specifico dell'errore.
+          description: Un riassunto breve e leggibile del problema.
+        status:
+          type: integer
+          description: Il codice di stato HTTP generato dal server.
+        detail:
+          type: string
+          description: Una spiegazione specifica e dettagliata di questa occorrenza del problema.
+        instance:
+          type: string
+          description: Un URI che identifica l'occorrenza specifica dell'errore.
