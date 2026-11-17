@@ -1,0 +1,469 @@
+openapi: 3.1.0
+info:
+  title: Ticketing Platform Notifications API contract
+  description: RESTful API contract for the Notifications microservice of the Ticketing Platform.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8084/api/v1         # temporaneo
+    description: Notifications API Gateway
+
+security:
+  - bearerAuth: []
+
+paths:
+  /users/{id_user}/notifications:
+    get:
+      summary: Retrieve User Notification History
+      description: Returns a cursor-paginated list of notifications dispatched to a specific user.
+      operationId: getUserNotifications
+      parameters:
+        - name: id_user
+          in: path
+          description: Unique identifier of the recipient user.
+          required: true
+          schema:
+            type: string
+            example: "usr_1042"
+        - name: cursor
+          in: query
+          description: Pagination cursor returned by the previous page response.
+          required: false
+          schema:
+            type: string
+            example: "eyJpZCI6Im50Zl83MDAyIn0"
+        - name: limit
+          in: query
+          description: Maximum number of notification logs to return per page.
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 20
+            example: 20
+      responses:
+        '200':
+          description: Paginated notification history successfully retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPageResponse'
+              example:
+                items:
+                  - id_notification: "ntf_7001"
+                    id_user: "usr_1042"
+                    notification_type: "SUCCESS"
+                    status: "SENT"
+                    sent_at: "2026-11-14T12:35:10+01:00"
+                  - id_notification: "ntf_7002"
+                    id_user: "usr_1042"
+                    notification_type: "ERROR"
+                    status: "FAILED"
+                    sent_at: "2026-11-14T12:35:12+01:00"
+                next_cursor: null
+                limit: 20
+        '400':
+          description: Malformed query or path parameter format.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "about:blank"
+                title: "Bad Request"
+                status: 400
+                detail: "Invalid format for limit query parameter. Expected integer."
+                instance: "/api/v1/users/usr_1042/notifications"
+                code: "invalid_parameter"
+        '401':
+          description: Missing or invalid JWT bearer token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/unauthorized"
+                title: "Unauthorized"
+                status: 401
+                detail: "Missing or invalid bearer token."
+                instance: "/api/v1/users/usr_1042/notifications"
+                code: "unauthorized"
+        '403':
+          description: Authenticated caller is not authorized to inspect another user's notification logs.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/forbidden"
+                title: "Forbidden"
+                status: 403
+                detail: "Access denied to another user's notification logs."
+                instance: "/api/v1/users/usr_1042/notifications"
+                code: "forbidden"
+        '422':
+          description: Semantically invalid query parameter.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/validation"
+                title: "Validation Failed"
+                status: 422
+                detail: "One or more query parameters failed validation."
+                instance: "/api/v1/users/usr_1042/notifications"
+                code: "validation_failed"
+                errors:
+                  - field: "limit"
+                    code: "out_of_range"
+                    detail: "Must be between 1 and 200."
+        '500':
+          description: Internal server error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/internal-server-error"
+                title: "Internal Server Error"
+                status: 500
+                detail: "An unexpected internal error occurred."
+                instance: "/api/v1/users/usr_1042/notifications"
+                code: "internal_error"
+
+  /notifications/{id_notification}:
+    get:
+      summary: Retrieve Single Notification Log
+      description: Returns the delivery status and metadata of a specific notification log entry.
+      operationId: getNotificationById
+      parameters:
+        - name: id_notification
+          in: path
+          description: Unique identifier of the notification log entry.
+          required: true
+          schema:
+            type: string
+            example: "ntf_7001"
+      responses:
+        '200':
+          description: Notification log entry successfully retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationLogResponse'
+              example:
+                id_notification: "ntf_7001"
+                id_user: "usr_1042"
+                notification_type: "SUCCESS"
+                status: "SENT"
+                sent_at: "2026-11-14T12:35:10+01:00"
+        '400':
+          description: Malformed id_notification path parameter.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "about:blank"
+                title: "Bad Request"
+                status: 400
+                detail: "Malformed notification identifier."
+                instance: "/api/v1/notifications/%ZZ"
+                code: "invalid_parameter"
+        '401':
+          description: Missing or invalid JWT bearer token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/unauthorized"
+                title: "Unauthorized"
+                status: 401
+                detail: "Missing or invalid bearer token."
+                instance: "/api/v1/notifications/ntf_7001"
+                code: "unauthorized"
+        '404':
+          description: Notification log not found.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/notification-not-found"
+                title: "Notification Not Found"
+                status: 404
+                detail: "Notification ntf_7001 does not exist."
+                instance: "/api/v1/notifications/ntf_7001"
+                code: "notification_not_found"
+        '500':
+          description: Internal server error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/internal-server-error"
+                title: "Internal Server Error"
+                status: 500
+                detail: "An unexpected internal error occurred."
+                instance: "/api/v1/notifications/ntf_7001"
+                code: "internal_error"
+
+  /notifications:
+    post:
+      summary: Dispatch or Resend Notification
+      description: Triggers a synchronous manual notification dispatch and records the outcome in NotificationLog.
+      operationId: sendNotification
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          description: Client-generated UUID uniquely identifying this logical dispatch attempt.
+          required: true
+          schema:
+            type: string
+            format: uuid
+            example: "550e8400-e29b-41d4-a716-446655440000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendNotificationRequest'
+            example:
+              id_user: "usr_1042"
+              notification_type: "SUCCESS"
+              id_ticket: "tkt_3001"
+      responses:
+        '201':
+          description: Notification dispatched and logged successfully.
+          headers:
+            Location:
+              description: URI of the created NotificationLog resource.
+              schema:
+                type: string
+                example: "/api/v1/notifications/ntf_7003"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationLogResponse'
+              example:
+                id_notification: "ntf_7003"
+                id_user: "usr_1042"
+                notification_type: "SUCCESS"
+                status: "SENT"
+                sent_at: "2026-11-14T14:10:00+01:00"
+        '400':
+          description: Unparseable JSON payload, missing Idempotency-Key header, or unknown fields rejected by strict binding.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "about:blank"
+                title: "Bad Request"
+                status: 400
+                detail: "Malformed JSON payload or unknown property."
+                instance: "/api/v1/notifications"
+                code: "bad_request"
+        '401':
+          description: Missing or invalid JWT bearer token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/unauthorized"
+                title: "Unauthorized"
+                status: 401
+                detail: "Missing or invalid bearer token."
+                instance: "/api/v1/notifications"
+                code: "unauthorized"
+        '403':
+          description: Caller is not authorized to dispatch notifications for the target user.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/forbidden"
+                title: "Forbidden"
+                status: 403
+                detail: "Caller lacks permission to trigger notifications for this user."
+                instance: "/api/v1/notifications"
+                code: "forbidden"
+        '409':
+          description: Conflict - A request with the same Idempotency-Key is currently in flight.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/idempotency-in-flight"
+                title: "Request In Flight"
+                status: 409
+                detail: "A notification dispatch with this Idempotency-Key is currently being processed."
+                instance: "/api/v1/notifications"
+                code: "idempotency_in_flight"
+        '422':
+          description: Semantically invalid request payload or Idempotency-Key reused with a different request body.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/validation"
+                title: "Validation Failed"
+                status: 422
+                detail: "One or more request fields failed validation."
+                instance: "/api/v1/notifications"
+                code: "validation_failed"
+                errors:
+                  - field: "notification_type"
+                    code: "unsupported_channel"
+                    detail: "Must be one of: SUCCESS, INFO, ERROR."
+        '500':
+          description: Internal server error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/internal-server-error"
+                title: "Internal Server Error"
+                status: 500
+                detail: "An unexpected internal error occurred."
+                instance: "/api/v1/notifications"
+                code: "internal_error"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT bearer token issued by Keycloak for user, support, or internal service authentication.
+
+  schemas:
+    NotificationLogResponse:
+      type: object
+      description: Audit record representing a single notification sent to a user.
+      required:
+        - id_notification
+        - id_user
+        - notification_type
+        - status
+        - sent_at
+      properties:
+        id_notification:
+          type: string
+          description: Unique identifier of the notification log entry.
+        id_user:
+          type: string
+          description: Identifier of the recipient user.
+        notification_type:
+          type: string
+          enum: [SUCCESS, INFO, ERROR]
+          description: Semantic category of the notification.
+        status:
+          type: string
+          enum: [PENDING, SENT, FAILED]
+          description: Current delivery outcome of the notification.
+        sent_at:
+          type: string
+          format: date-time
+          description: Timestamp indicating when the notification was dispatched.
+
+    NotificationPageResponse:
+      type: object
+      description: Cursor-paginated envelope containing a page of user notification logs.
+      required:
+        - items
+        - next_cursor
+        - limit
+      properties:
+        items:
+          type: array
+          description: List of notification logs in the current page.
+          items:
+            $ref: '#/components/schemas/NotificationLogResponse'
+        next_cursor:
+          type: ["string", "null"]
+          description: Cursor to fetch the next page, or null if this is the last page.
+        limit:
+          type: integer
+          description: Effective page size applied by the server.
+
+    SendNotificationRequest:
+      type: object
+      description: Payload used to manually trigger or resend a notification to a user.
+      required:
+        - id_user
+        - notification_type
+      additionalProperties: false
+      properties:
+        id_user:
+          type: string
+          minLength: 1
+          description: Identifier of the target user.
+        notification_type:
+          type: string
+          enum: [SUCCESS, INFO, ERROR]
+          description: Semantic category of the notification.
+        id_ticket:
+          type: string
+          minLength: 1
+          description: Identifier of the ticket to attach or reference in the notification.
+
+    FieldError:
+      type: object
+      description: Details of a single field-level validation failure (RFC 9457 extension).
+      required:
+        - field
+        - code
+        - detail
+      properties:
+        field:
+          type: string
+          description: Name of the request field or parameter that failed validation.
+        code:
+          type: string
+          description: Stable validation error code.
+        detail:
+          type: string
+          description: Explanation of why the field was rejected.
+
+    ProblemDetail:
+      type: object
+      description: Standard RFC 7807 / RFC 9457 error response representation.
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - instance
+      properties:
+        type:
+          type: string
+          description: A URI reference that identifies the problem type.
+        title:
+          type: string
+          description: A short summary of the problem type.
+        status:
+          type: integer
+          description: The HTTP status code generated by the origin server.
+        detail:
+          type: string
+          description: An explanation specific to this occurrence of the problem.
+        instance:
+          type: string
+          description: A URI reference that identifies the specific occurrence of the problem.
+        code:
+          type: string
+          description: Stable error identifier used by clients for programmatic branching.
+        errors:
+          type: array
+          description: Optional list of field-level errors.
+          items:
+            $ref: '#/components/schemas/FieldError'
