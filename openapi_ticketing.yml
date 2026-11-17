@@ -1,0 +1,647 @@
+openapi: 3.1.0
+info:
+  title: Ticketing Platform Ticketing API contract
+  description: RESTful API contract for the Ticketing microservice.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8083/api/v1         # temporaneo
+    description: Ticketing API Gateway
+
+security:
+  - bearerAuth: []
+
+paths:
+  /users/{id_user}/tickets:
+    get:
+      summary: Retrieve User Tickets
+      description: Returns a cursor-paginated list of tickets issued for a specific user.
+      operationId: getUserTickets
+      parameters:
+        - name: id_user
+          in: path
+          description: Unique identifier of the user owning the tickets.
+          required: true
+          schema:
+            type: string
+            example: "usr_1042"
+        - name: cursor
+          in: query
+          description: Pagination cursor returned by the previous page response.
+          required: false
+          schema:
+            type: string
+            example: "eyJpZCI6InRrdF8zMDAyIn0"
+        - name: limit
+          in: query
+          description: Maximum number of items to return per page.
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 20
+            example: 20
+      responses:
+        '200':
+          description: Paginated list of user tickets successfully retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketPageResponse'
+              example:
+                items:
+                  - id_ticket: "tkt_3001"
+                    id_seat: "seat_5001"
+                    id_user: "usr_1042"
+                    qr_path: "/tickets/qr/tkt_3001_a9f8b2.png"
+                    status: "ISSUED"
+                  - id_ticket: "tkt_3002"
+                    id_seat: "seat_5002"
+                    id_user: "usr_1042"
+                    qr_path: "/tickets/qr/tkt_3002_c4d1e7.png"
+                    status: "USED"
+                next_cursor: null
+                limit: 20
+        '400':
+          description: Malformed query or path parameter format.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "about:blank"
+                title: "Bad Request"
+                status: 400
+                detail: "Invalid format for limit query parameter. Expected integer."
+                instance: "/api/v1/users/usr_1042/tickets"
+                code: "invalid_parameter"
+        '401':
+          description: Missing or invalid JWT bearer token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/unauthorized"
+                title: "Unauthorized"
+                status: 401
+                detail: "Missing or invalid bearer token."
+                instance: "/api/v1/users/usr_1042/tickets"
+                code: "unauthorized"
+        '403':
+          description: The authenticated caller is not authorized to access another user's ticket wallet.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/forbidden"
+                title: "Forbidden"
+                status: 403
+                detail: "Access denied to another user's ticket wallet."
+                instance: "/api/v1/users/usr_1042/tickets"
+                code: "forbidden"
+        '422':
+          description: Semantically invalid query parameter (e.g., negative limit or invalid cursor).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/validation"
+                title: "Validation Failed"
+                status: 422
+                detail: "One or more query parameters failed validation."
+                instance: "/api/v1/users/usr_1042/tickets"
+                code: "validation_failed"
+                errors:
+                  - field: "limit"
+                    code: "out_of_range"
+                    detail: "Must be between 1 and 200."
+        '500':
+          description: Internal server error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/internal-server-error"
+                title: "Internal Server Error"
+                status: 500
+                detail: "An unexpected internal error occurred."
+                instance: "/api/v1/users/usr_1042/tickets"
+                code: "internal_error"
+
+  /tickets/{id_ticket}:
+    get:
+      summary: Retrieve Single Ticket
+      description: Returns the JSON metadata of a single ticket.
+      operationId: getTicketById
+      parameters:
+        - name: id_ticket
+          in: path
+          description: Unique opaque identifier of the ticket.
+          required: true
+          schema:
+            type: string
+            example: "tkt_3001"
+      responses:
+        '200':
+          description: Ticket details successfully returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketResponse'
+              example:
+                id_ticket: "tkt_3001"
+                id_seat: "seat_5001"
+                id_user: "usr_1042"
+                qr_path: "/tickets/qr/tkt_3001_a9f8b2.png"
+                status: "ISSUED"
+        '400':
+          description: Malformed id_ticket path parameter.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "about:blank"
+                title: "Bad Request"
+                status: 400
+                detail: "Malformed ticket identifier."
+                instance: "/api/v1/tickets/%ZZ"
+                code: "invalid_parameter"
+        '401':
+          description: Missing or invalid JWT bearer token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/unauthorized"
+                title: "Unauthorized"
+                status: 401
+                detail: "Missing or invalid bearer token."
+                instance: "/api/v1/tickets/tkt_3001"
+                code: "unauthorized"
+        '404':
+          description: Ticket not found.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/ticket-not-found"
+                title: "Ticket Not Found"
+                status: 404
+                detail: "Ticket tkt_3001 does not exist."
+                instance: "/api/v1/tickets/tkt_3001"
+                code: "ticket_not_found"
+        '500':
+          description: Internal server error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/internal-server-error"
+                title: "Internal Server Error"
+                status: 500
+                detail: "An unexpected internal error occurred."
+                instance: "/api/v1/tickets/tkt_3001"
+                code: "internal_error"
+
+  /tickets/{id_ticket}/scans:
+    post:
+      summary: Validate Ticket at Gate
+      description: Records a physical scan attempt at a venue gate by creating a GateLog resource.
+      operationId: scanTicket
+      parameters:
+        - name: id_ticket
+          in: path
+          description: Unique identifier of the ticket.
+          required: true
+          schema:
+            type: string
+            example: "tkt_3001"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScanRequest'
+            example:
+              gate_id: "GATE_NORTH_02"
+              scan_timestamp: "2026-12-15T20:15:30+01:00"
+      responses:
+        '201':
+          description: Valid ticket; access granted and gate scan log created.
+          headers:
+            Location:
+              description: URI of the newly created GateLog resource.
+              schema:
+                type: string
+                example: "/api/v1/tickets/tkt_3001/scans/log_8801"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GateLogResponse'
+              example:
+                id_log: "log_8801"
+                id_ticket: "tkt_3001"
+                scan_timestamp: "2026-12-15T20:15:30+01:00"
+                access_granted: true
+        '400':
+          description: Unparseable JSON body or unknown fields rejected by strict request binding.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "about:blank"
+                title: "Bad Request"
+                status: 400
+                detail: "Malformed JSON payload."
+                instance: "/api/v1/tickets/tkt_3001/scans"
+                code: "bad_request"
+        '401':
+          description: Missing or invalid scanner/operator JWT token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/unauthorized"
+                title: "Unauthorized"
+                status: 401
+                detail: "Missing or invalid scanner credentials."
+                instance: "/api/v1/tickets/tkt_3001/scans"
+                code: "unauthorized"
+        '403':
+          description: Caller lacks the required gate operator role (GATE_SCANNER).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/forbidden"
+                title: "Forbidden"
+                status: 403
+                detail: "Caller does not have gate validation privileges."
+                instance: "/api/v1/tickets/tkt_3001/scans"
+                code: "forbidden"
+        '404':
+          description: Ticket does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/ticket-not-found"
+                title: "Ticket Not Found"
+                status: 404
+                detail: "Ticket tkt_3001 does not exist."
+                instance: "/api/v1/tickets/tkt_3001/scans"
+                code: "ticket_not_found"
+        '409':
+          description: Conflict - The ticket has already been scanned or was cancelled/refunded.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/ticket-already-used"
+                title: "Ticket Already Used"
+                status: 409
+                detail: "Ticket tkt_3001 was already scanned at 2026-12-15T20:15:30+01:00; access denied."
+                instance: "/api/v1/tickets/tkt_3001/scans"
+                code: "ticket_already_used"
+        '422':
+          description: Syntactically well-formed payload that fails semantic validation.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/validation"
+                title: "Validation Failed"
+                status: 422
+                detail: "One or more request fields failed validation."
+                instance: "/api/v1/tickets/tkt_3001/scans"
+                code: "validation_failed"
+                errors:
+                  - field: "scan_timestamp"
+                    code: "invalid_timestamp"
+                    detail: "Must be a valid ISO-8601 timestamp with explicit timezone offset."
+        '500':
+          description: Internal server error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/internal-server-error"
+                title: "Internal Server Error"
+                status: 500
+                detail: "An unexpected internal error occurred."
+                instance: "/api/v1/tickets/tkt_3001/scans"
+                code: "internal_error"
+
+    get:
+      summary: Retrieve Ticket Scan History
+      description: Returns a cursor-paginated history of gate scan logs (GateLog) recorded for a specific ticket.
+      operationId: getTicketScans
+      parameters:
+        - name: id_ticket
+          in: path
+          description: Unique opaque identifier of the ticket.
+          required: true
+          schema:
+            type: string
+            example: "tkt_3001"
+        - name: cursor
+          in: query
+          description: Opaque pagination cursor returned by the previous page response.
+          required: false
+          schema:
+            type: string
+            example: "eyJpZCI6ImxvZ184ODAyIn0"
+        - name: limit
+          in: query
+          description: Maximum number of scan logs to return per page (server-clamped to max 200).
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+            example: 50
+      responses:
+        '200':
+          description: Paginated scan history successfully retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GateLogPageResponse'
+              example:
+                items:
+                  - id_log: "log_8801"
+                    id_ticket: "tkt_3001"
+                    scan_timestamp: "2026-12-15T20:15:30+01:00"
+                    access_granted: true
+                  - id_log: "log_8802"
+                    id_ticket: "tkt_3001"
+                    scan_timestamp: "2026-12-15T20:18:10+01:00"
+                    access_granted: false
+                next_cursor: null
+                limit: 50
+        '400':
+          description: Malformed query or path parameter format.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "about:blank"
+                title: "Bad Request"
+                status: 400
+                detail: "Invalid format for limit query parameter. Expected integer."
+                instance: "/api/v1/tickets/tkt_3001/scans"
+                code: "invalid_parameter"
+        '401':
+          description: Missing or invalid JWT bearer token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/unauthorized"
+                title: "Unauthorized"
+                status: 401
+                detail: "Missing or invalid bearer token."
+                instance: "/api/v1/tickets/tkt_3001/scans"
+                code: "unauthorized"
+        '403':
+          description: Access denied to gate audit logs.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/forbidden"
+                title: "Forbidden"
+                status: 403
+                detail: "Insufficient permissions to view gate scan logs."
+                instance: "/api/v1/tickets/tkt_3001/scans"
+                code: "forbidden"
+        '404':
+          description: Ticket not found.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/ticket-not-found"
+                title: "Ticket Not Found"
+                status: 404
+                detail: "Ticket tkt_3001 does not exist."
+                instance: "/api/v1/tickets/tkt_3001/scans"
+                code: "ticket_not_found"
+        '422':
+          description: Semantically invalid query parameter (e.g., negative limit or invalid cursor).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/validation"
+                title: "Validation Failed"
+                status: 422
+                detail: "One or more query parameters failed validation."
+                instance: "/api/v1/tickets/tkt_3001/scans"
+                code: "validation_failed"
+                errors:
+                  - field: "limit"
+                    code: "out_of_range"
+                    detail: "Must be between 1 and 200."
+        '500':
+          description: Internal server error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://api.ticketing.local/problems/internal-server-error"
+                title: "Internal Server Error"
+                status: 500
+                detail: "An unexpected internal error occurred."
+                instance: "/api/v1/tickets/tkt_3001/scans"
+                code: "internal_error"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT bearer token issued by Keycloak for user or gate operator authentication.
+
+  schemas:
+    TicketResponse:
+      type: object
+      description: Representation of an access ticket issued upon payment confirmation.
+      required:
+        - id_ticket
+        - id_seat
+        - id_user
+        - qr_path
+        - status
+      properties:
+        id_ticket:
+          type: string
+          description: Unique identifier of the ticket.
+        id_seat:
+          type: string
+          description: Reference to the specific seat assigned to the ticket.
+        id_user:
+          type: string
+          description: Identifier of the user owning the ticket.
+        qr_path:
+          type: string
+          description: URI of the QR code image associated with the ticket.
+        status:
+          type: string
+          enum: [ISSUED, USED, CANCELLED]
+          description: Current lifecycle state of the ticket.
+
+    TicketPageResponse:
+      type: object
+      description: Cursor-paginated envelope containing a page of user tickets.
+      required:
+        - items
+        - next_cursor
+        - limit
+      properties:
+        items:
+          type: array
+          description: List of tickets in the current page.
+          items:
+            $ref: '#/components/schemas/TicketResponse'
+        next_cursor:
+          type: ["string", "null"]
+          description: Cursor to fetch the next page, or null if this is the last page.
+        limit:
+          type: integer
+          description: Effective page size applied by the server.
+
+    ScanRequest:
+      type: object
+      description: Payload sent by the access control terminal when scanning a ticket at the gate.
+      required:
+        - gate_id
+        - scan_timestamp
+      additionalProperties: false
+      properties:
+        gate_id:
+          type: string
+          minLength: 1
+          description: Physical identifier of the gate or scanner device performing the validation.
+        scan_timestamp:
+          type: string
+          format: date-time
+          description: Instant of the scan.
+
+    GateLogResponse:
+      type: object
+      description: Immutable record of a physical gate scan attempt.
+      required:
+        - id_log
+        - id_ticket
+        - scan_timestamp
+        - access_granted
+      properties:
+        id_log:
+          type: string
+          description: Unique identifier of the scan log entry.
+        id_ticket:
+          type: string
+          description: Identifier of the scanned ticket.
+        scan_timestamp:
+          type: string
+          format: date-time
+          description: Timestamp when the scan occurred.
+        access_granted:
+          type: boolean
+          description: Validation outcome (true if entry was granted, false if denied).
+
+    GateLogPageResponse:
+      type: object
+      description: Cursor-paginated envelope containing a page of gate scan logs.
+      required:
+        - items
+        - next_cursor
+        - limit
+      properties:
+        items:
+          type: array
+          description: List of gate scan logs in the current page.
+          items:
+            $ref: '#/components/schemas/GateLogResponse'
+        next_cursor:
+          type: ["string", "null"]
+          description: Cursor to fetch the next page, or null if this is the last page.
+        limit:
+          type: integer
+          description: Effective page size applied by the server.
+
+    FieldError:
+      type: object
+      description: Details of a single field-level validation failure (RFC 9457 extension).
+      required:
+        - field
+        - code
+        - detail
+      properties:
+        field:
+          type: string
+          description: Name of the request field or parameter that failed validation.
+        code:
+          type: string
+          description: Stable machine-readable validation error code.
+        detail:
+          type: string
+          description: Human-readable explanation of why the field was rejected.
+
+    ProblemDetail:
+      type: object
+      description: Standard RFC 7807 / RFC 9457 error response representation.
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - instance
+      properties:
+        type:
+          type: string
+          description: A URI reference that identifies the problem type.
+        title:
+          type: string
+          description: A short summary of the problem type.
+        status:
+          type: integer
+          description: The HTTP status code generated by the origin server.
+        detail:
+          type: string
+          description: An explanation specific to this occurrence of the problem.
+        instance:
+          type: string
+          description: A URI reference that identifies the specific occurrence of the problem.
+        code:
+          type: string
+          description: Stable error identifier used by clients for programmatic branching.
+        errors:
+          type: array
+          description: Optional list of field-level errors.
+          items:
+            $ref: '#/components/schemas/FieldError'
