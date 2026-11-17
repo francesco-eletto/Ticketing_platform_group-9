@@ -1,38 +1,41 @@
 openapi: 3.1.0
 info:
   title: Ticketing Platform Inventory & Orders API contract
-  description: API RESTful per il microservizio Inventory & Orders della piattaforma di Ticketing.
+  description: RESTful API for the Inventory & Orders microservice of the Ticketing platform.
   version: 1.0.0
 servers:
-  - url: http://localhost:8081/api/v1         # temporaneo
+  - url: http://localhost:8081/api/v1           # temporaneo
     description: Inventory & Orders API Gateway
 
 paths:
   /users/{id_user}/holds/active:
     get:
-      summary: Recupero Carrello Attivo
-      description: Restituisce l'hold attivo per un utente, utile per recuperare la sessione in caso di crash del client.
+      summary: Retrieve Active Cart
+      description: Returns the active hold for a user, useful for session recovery in case of a client crash.
       operationId: getActiveHoldByUser
+      security:
+        - bearerAuth: []
       parameters:
         - name: id_user
           in: path
-          description: ID dell'utente.
+          description: User ID.
           required: true
           schema:
-            type: integer
-            example: 1042
+            type: string
+            example: "1042"
       responses:
         '200':
-          description: Hold attivo recuperato con successo.
+          description: Active hold successfully retrieved.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HoldResponse'
               example:
-                id_hold: 9988
+                id_hold: "9988"
                 expiration_timestamp: "2026-11-14T12:44:00Z"
+                seats: ["5001", "5002"]
         '404':
-          description: Nessun hold attivo trovato per l'utente.
+          description: No active hold found for the user.
           content:
             application/problem+json:
               schema:
@@ -43,30 +46,31 @@ paths:
                 status: 404
                 detail: "No active hold found for user 1042."
                 instance: "/users/1042/holds/active"
+                code: "hold_not_found"
 
   /events/{id_event}/sectors/{id_sector}/seats:
     get:
-      summary: Esplorazione Posti
-      description: Restituisce la mappa dei posti per un settore.
+      summary: Explore Seats
+      description: Returns the map of seats for a sector.
       operationId: getSeatsBySector
       parameters:
         - name: id_event
           in: path
-          description: ID univoco dell'evento.
+          description: Unique ID of the event.
           required: true
           schema:
-            type: integer
-            example: 4711
+            type: string
+            example: "4711"
         - name: id_sector
           in: path
-          description: ID univoco del settore.
+          description: Unique ID of the sector.
           required: true
           schema:
-            type: integer
-            example: 101
+            type: string
+            example: "101"
       responses:
         '200':
-          description: Lista dei sedili con relativo stato recuperata con successo.
+          description: List of seats with their status successfully retrieved.
           content:
             application/json:
               schema:
@@ -74,18 +78,18 @@ paths:
                 items:
                   $ref: '#/components/schemas/Seat'
               example:
-                - id_seat: 5001
-                  id_event: 4711
-                  id_sector: 101
+                - id_seat: "5001"
+                  id_event: "4711"
+                  id_sector: "101"
                   seat_label: "A1"
                   status: "FREE"
-                - id_seat: 5002
-                  id_event: 4711
-                  id_sector: 101
+                - id_seat: "5002"
+                  id_event: "4711"
+                  id_sector: "101"
                   seat_label: "A2"
                   status: "HELD"
         '404':
-          description: Evento o Settore non trovato.
+          description: Event or Sector not found.
           content:
             application/problem+json:
               schema:
@@ -96,8 +100,9 @@ paths:
                 status: 404
                 detail: "Sector 101 for Event 4711 does not exist."
                 instance: "/events/4711/sectors/101/seats"
+                code: "sector_not_found"
         '400':
-          description: Richiesta malformata.
+          description: Malformed request.
           content:
             application/problem+json:
               schema:
@@ -108,8 +113,9 @@ paths:
                 status: 400
                 detail: "Invalid format for path parameters."
                 instance: "/events/abc/sectors/def/seats"
+                code: "bad_request"
         '500':
-          description: Errore interno del server.
+          description: Internal server error.
           content:
             application/problem+json:
               schema:
@@ -118,14 +124,17 @@ paths:
                 type: "http://localhost:8081/errors/internal-server-error"
                 title: "Internal Server Error"
                 status: 500
-                detail: "Database connection failed."
+                detail: "An unexpected internal error occurred."
                 instance: "/events/4711/sectors/101/seats"
+                code: "internal_server_error"
 
   /holds:
     post:
-      summary: Creazione Hold
-      description: Crea un blocco temporaneo per un array di posti selezionati.
+      summary: Create Hold
+      description: Creates a temporary block for an array of selected seats.
       operationId: createHold
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -133,20 +142,21 @@ paths:
             schema:
               $ref: '#/components/schemas/HoldRequest'
             example:
-              id_user: 1042
-              seats: [5001, 5002]
+              id_user: "1042"
+              seats: ["5001", "5002"]
       responses:
         '201':
-          description: Hold creato con successo.
+          description: Hold successfully created.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HoldResponse'
               example:
-                id_hold: 9988
+                id_hold: "9988"
                 expiration_timestamp: "2026-11-14T12:44:00Z"
+                seats: ["5001", "5002"]
         '409':
-          description: Conflitto - Uno o più posti selezionati non sono più FREE.
+          description: Conflict - One or more selected seats are no longer FREE.
           content:
             application/problem+json:
               schema:
@@ -157,8 +167,9 @@ paths:
                 status: 409
                 detail: "Seat 5001 is already HELD or SOLD."
                 instance: "/holds"
+                code: "seat_conflict"
         '400':
-          description: Richiesta malformata.
+          description: Malformed request JSON structure or invalid types.
           content:
             application/problem+json:
               schema:
@@ -167,20 +178,56 @@ paths:
                 type: "about:blank"
                 title: "Bad Request"
                 status: 400
-                detail: "The 'seats' array cannot be empty."
+                detail: "Malformed JSON request."
                 instance: "/holds"
-        '500':
-          description: Errore interno del server.
+                code: "bad_request"
+        '422':
+          description: Unprocessable Content - Semantic validation failed (e.g., empty seats array).
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "http://localhost:8081/errors/validation-failed"
+                title: "Validation Failed"
+                status: 422
+                detail: "The 'seats' array cannot be empty."
+                instance: "/holds"
+                code: "validation_failed"
+                errors:
+                  - field: "seats"
+                    code: "not_empty"
+                    detail: "The seats array must contain at least one seat."
+        '500':
+          description: Internal server error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "http://localhost:8081/errors/internal-server-error"
+                title: "Internal Server Error"
+                status: 500
+                detail: "An unexpected internal error occurred."
+                instance: "/holds"
+                code: "internal_server_error"
 
   /orders:
     post:
-      summary: Checkout e creazione Ordine
-      description: Associa l'Hold a un Order e avvia il processo di pagamento asincrono.
+      summary: Checkout and Order Creation
+      description: Associates the Hold with an Order and initiates the asynchronous payment process.
       operationId: createOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          description: Unique key to safely retry the checkout operation.
+          required: true
+          schema:
+            type: string
+            format: uuid
+            example: "123e4567-e89b-12d3-a456-426614174000"
       requestBody:
         required: true
         content:
@@ -188,22 +235,25 @@ paths:
             schema:
               $ref: '#/components/schemas/OrderRequest'
             example:
-              id_hold: 9988
-              id_user: 1042
-              total_amount: 12050
+              id_hold: "9988"
+              id_user: "1042"
+              total_amount:
+                amount: "120.50"
+                currency: "EUR"
       responses:
         '201':
-          description: Ordine creato, in attesa di pagamento.
+          description: Order created, pending payment.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderResponse'
               example:
-                id_order: 12345
+                id_order: "12345"
                 status: "PENDING"
                 created_at: "2026-11-14T12:34:00Z"
+                payment_url: "https://checkout.stripe.com/pay/cs_test_12345"
         '404':
-          description: Hold non trovato.
+          description: Hold not found.
           content:
             application/problem+json:
               schema:
@@ -214,125 +264,238 @@ paths:
                 status: 404
                 detail: "Hold 9988 does not exist."
                 instance: "/orders"
+                code: "hold_not_found"
         '409':
-          description: Conflitto - L'Hold è scaduto.
+          description: Conflict - The Hold has expired or Price Mismatch.
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetail'
               example:
-                type: "http://localhost:8081/errors/hold-expired"
-                title: "Hold Expired"
+                type: "http://localhost:8081/errors/price-mismatch"
+                title: "Price Mismatch"
                 status: 409
-                detail: "Hold 9988 has expired and cannot be converted into an order."
+                detail: "The provided total amount does not match the current calculated price."
                 instance: "/orders"
+                code: "price_mismatch"
         '400':
-          description: Richiesta malformata.
+          description: Malformed request JSON structure or invalid types.
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "about:blank"
+                title: "Bad Request"
+                status: 400
+                detail: "Malformed JSON request."
+                instance: "/orders"
+                code: "bad_request"
+        '422':
+          description: Unprocessable Content - Semantic validation failed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "http://localhost:8081/errors/validation-failed"
+                title: "Validation Failed"
+                status: 422
+                detail: "Invalid total_amount format."
+                instance: "/orders"
+                code: "validation_failed"
+                errors:
+                  - field: "total_amount.amount"
+                    code: "invalid_format"
+                    detail: "The amount must be a valid decimal string."
         '500':
-          description: Errore interno del server.
+          description: Internal server error.
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "http://localhost:8081/errors/internal-server-error"
+                title: "Internal Server Error"
+                status: 500
+                detail: "An unexpected internal error occurred."
+                instance: "/orders"
+                code: "internal_server_error"
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
+    Money:
+      type: object
+      description: Monetary value object.
+      required:
+        - amount
+        - currency
+      properties:
+        amount:
+          type: string
+          description: The amount represented as a string for exact decimal precision.
+        currency:
+          type: string
+          description: ISO 4217 currency code.
+
     Seat:
       type: object
-      description: Singolo posto per uno specifico evento.
+      description: Single seat for a specific event.
+      required:
+        - id_seat
+        - id_event
+        - id_sector
+        - seat_label
+        - status
       properties:
         id_seat:
-          type: integer
-          description: Identificativo univoco globale del posto.
+          type: string
+          description: Globally unique identifier of the seat.
         id_event:
-          type: integer
-          description: ID dell'evento.
+          type: string
+          description: ID of the event.
         id_sector:
-          type: integer
-          description: ID del settore di appartenenza.
+          type: string
+          description: ID of the belonging sector.
         seat_label:
           type: string
-          description: Etichetta del posto sulla mappa.
+          description: Label of the seat on the map.
         status:
           type: string
           enum: [FREE, HELD, SOLD]
-          description: Stato corrente del posto.
+          description: Current status of the seat.
           
     HoldRequest:
       type: object
-      description: Body per la richiesta di blocco posti.
+      description: Body for the seat block request.
+      required:
+        - id_user
+        - seats
+      additionalProperties: false
       properties:
         id_user:
-          type: integer
-          description: ID dell'utente che effettua l'operazione.
+          type: string
+          description: ID of the user performing the operation.
         seats:
           type: array
-          description: Array di id_seat univoci da bloccare.
+          description: Array of unique id_seat to block.
           items:
-            type: integer
+            type: string
           
     HoldResponse:
       type: object
-      description: Risposta di conferma del blocco.
+      description: Block confirmation response.
+      required:
+        - id_hold
+        - expiration_timestamp
+        - seats
       properties:
         id_hold:
-          type: integer
-          description: ID del blocco temporaneo generato.
+          type: string
+          description: ID of the generated temporary block.
         expiration_timestamp:
           type: string
           format: date-time
-          description: Timestamp assoluto in cui scadrà il blocco.
+          description: Absolute timestamp when the block will expire.
+        seats:
+          type: array
+          description: Array of unique id_seat currently blocked.
+          items:
+            type: string
           
     OrderRequest:
       type: object
-      description: Body per convertire un Hold in un Ordine.
+      description: Body to convert a Hold into an Order.
+      required:
+        - id_hold
+        - id_user
+        - total_amount
+      additionalProperties: false
       properties:
         id_hold:
-          type: integer
-          description: ID dell'Hold precedentemente generato.
+          type: string
+          description: ID of the previously generated Hold.
         id_user:
-          type: integer
-          description: ID dell'utente acquirente.
+          type: string
+          description: ID of the purchasing user.
         total_amount:
-          type: integer
-          description: "Totale dell'ordine espresso in centesimi per evitare errori di arrotondamento."
+          $ref: '#/components/schemas/Money'
           
     OrderResponse:
       type: object
-      description: Risposta di creazione ordine.
+      description: Order creation response.
+      required:
+        - id_order
+        - status
+        - created_at
       properties:
         id_order:
-          type: integer
-          description: ID del nuovo ordine.
+          type: string
+          description: ID of the new order.
         status:
           type: string
           enum: [PENDING, COMPLETED, FAILED]
-          description: Stato dell'ordine.
+          description: Order status.
         created_at:
           type: string
           format: date-time
-          description: Timestamp di creazione.
+          description: Creation timestamp.
+        payment_url:
+          type: string
+          description: URL of the external gateway to redirect the user to.
 
     ProblemDetail:
       type: object
-      description: Modello standard RFC 7807 per la restituzione degli errori da parte delle API.
+      description: Standard RFC 9457 model for API error responses.
+      required:
+        - type
+        - title
+        - status
+        - detail
       properties:
         type:
           type: string
-          description: Un URI che identifica il tipo di problema.
+          description: A URI that identifies the problem type.
         title:
           type: string
-          description: Un riassunto breve e leggibile del problema.
+          description: A short, human-readable summary of the problem.
         status:
           type: integer
-          description: Il codice di stato HTTP generato dal server di origine.
+          description: The HTTP status code generated by the origin server.
         detail:
           type: string
-          description: Una spiegazione specifica e dettagliata di questa occorrenza del problema.
+          description: A human-readable explanation specific to this occurrence of the problem.
         instance:
           type: string
-          description: Un URI che identifica l'occorrenza specifica dell'errore.
+          description: A URI reference that identifies the specific occurrence of the problem.
+        code:
+          type: string
+          description: Application-specific error code for programmatic handling.
+        errors:
+          type: array
+          description: Array of field-level validation errors.
+          items:
+            $ref: '#/components/schemas/FieldError'
+
+    FieldError:
+      type: object
+      description: Details of a field-level validation failure.
+      required:
+        - field
+        - code
+        - detail
+      properties:
+        field:
+          type: string
+          description: The field that failed validation.
+        code:
+          type: string
+          description: The specific error code for this field.
+        detail:
+          type: string
+          description: A human-readable explanation of the validation error.

@@ -7,5 +7,3 @@ Implementing a multi-services ticketing platform
 * Data Structure: https://docs.google.com/document/d/10FAcSEY8-E4KZP435TUxfQ9Q6dL8dGm5X9qd730sWeM/edit?usp=sharing
 
 ## TODO:
-- Value Classes for SeatId OrderId etc...
-- Money field -> {amount: i64 (minor unit), currency}
